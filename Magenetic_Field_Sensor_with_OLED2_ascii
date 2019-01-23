@@ -1,0 +1,156 @@
+/*
+  Based on sample code from Nathan Seidle. Minimal changes to get three axis data to the display.
+  Worked well enough for desired testing. 
+  -Shane Trent
+
+  MLX90393 Magnetometer Example Code
+  By: Nathan Seidle
+  SparkFun Electronics
+  Date: February 6th, 2017
+  License: This code is public domain but you buy me a beer if you use this and we meet someday (Beerware license).
+
+  Wait for user to press button. Turn on LED if board responded correctly.
+
+  Hardware Connections (Breakoutboard to Arduino):
+  3.3V = 3.3V
+  GND = GND
+  SDA = A4
+  SCL = A5
+
+  Serial.print it out at 9600 baud to serial monitor.
+*/
+
+#include <Wire.h>
+#include <MLX90393.h> //From https://github.com/tedyapo/arduino-MLX90393 by Theodore Yapo
+
+
+// Next lines for setting up OLED display
+#include "U8glib.h"
+U8GLIB_SH1106_128X64 u8g(U8G_I2C_OPT_NONE);  // I2C / TWI
+float Mag = 0.0;  // Combined Field Magnitude
+float x = 0.0;       // X vector of field
+float y = 0.0;
+float z = 0.0;
+
+
+MLX90393 mlx;
+MLX90393::txyz data; //Create a structure, called data, of four floats (t, x, y, and z)
+
+#define LED 13
+#define BUTTON 8
+float average = 0000;
+
+char s[2] = " ";
+
+void draw(void) {
+   u8g.setFont(u8g_font_fub14r); // select font      
+   //u8g.setPrintPos(0,20);        // set position
+   s[0] = 230;
+   u8g.drawStr(0, 20, "x: ");   // put string of display at position X, Y
+   if (x > 0) {
+      u8g.setPrintPos(35,20);        // set position
+      u8g.print( x,0);  // display x vector µTesla
+   }
+   else {
+      u8g.setPrintPos(28,20);        // set position
+      u8g.print( x,0);  // display x vector µTesla
+   }
+   u8g.drawStr(100, 20, "uT");
+   
+   u8g.drawStr(0, 40, "y: ");
+   if (y > 0) {
+      u8g.setPrintPos(35,40);        // set position
+      u8g.print( y,0);  // display x vector µTesla
+   }
+   else {
+      u8g.setPrintPos(28,40);        // set position
+      u8g.print( y,0);  // display x vector µTesla
+   }
+   u8g.drawStr(100, 40, "uT");
+
+   u8g.drawStr(0, 60, "z: ");
+   if (z > 0) {
+      u8g.setPrintPos(35,60);        // set position
+      u8g.print( z,0);  // display x vector µTesla
+   }
+   else {
+      u8g.setPrintPos(28,60);        // set position
+      u8g.print( z,0);  // display x vector µTesla
+   }
+   u8g.drawStr(100, 60, "uT");
+}
+
+void setup()
+{
+  Serial.begin(9600);
+  Serial.println("MLX90393 Test");
+
+  pinMode(LED, OUTPUT);
+  digitalWrite(LED, LOW);
+  pinMode(BUTTON, INPUT_PULLUP);
+}
+
+
+void loop()
+{
+// Update OLED Display
+  u8g.firstPage();  
+  do {
+    draw();
+  } while( u8g.nextPage() );
+
+  
+  //Serial.println("Waiting for user to press button");
+  //while (digitalRead(BUTTON) == HIGH) delay(1); // Wait for button to be pressed
+  delay(50);
+
+
+  mlx.begin(); //Assumes I2C jumpers are GND. No DRDY pin used.
+
+  byte response = mlx.readData(data); //Read the values from the sensor
+  if (response == 0x00)
+  {
+    //Serial.print("Sensor GOOD");
+    //Serial.print(" magX[");
+    Serial.print(data.x);
+    Serial.print(", ");
+    Serial.print(data.y);
+    Serial.print(", ");
+    Serial.print(data.z);
+
+    x = data.x;
+    y = data.y;
+    z = data.z;
+    
+    //data.t = sqrt((data.x*data.x) + (data.y*data.y) + (data.z*data.z));
+    data.t = sqrt((data.x*data.x) + (data.y*data.y) + (data.z*data.z));
+    Serial.print(", ");
+    Serial.print(data.t);
+    Mag = data.t;  // assign value for OLED
+    average = ((4*average)+data.t)/5;
+    if (abs(abs(average) - abs(data.t)) > (data.t * 0.15)) 
+    {
+      digitalWrite(LED, HIGH);
+    }
+    else
+    {
+      digitalWrite(LED, LOW);  //Indicate start of test
+    }
+    Serial.print(",  ");
+    Serial.print(average);
+  }
+  else
+  {
+    Serial.print("FAIL!");
+
+    Serial.print(" Start response: 0x");
+    if (response < 0x10) Serial.print("0"); //Pretty output
+    Serial.println(response, HEX);
+
+    digitalWrite(LED, LOW);
+  }
+
+  Serial.println();
+
+  //while (digitalRead(BUTTON) == LOW) delay(1); //Wait for user to stop pressing button
+}
